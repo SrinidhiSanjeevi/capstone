@@ -1,0 +1,72 @@
+name: HomeEase Microservices CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - "admin-backend/**"
+      - "frontend/**"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+
+  # ============================================================
+  # Detect which service changed
+  # ============================================================
+
+  detect-changes:
+    runs-on: ubuntu-latest
+
+    outputs:
+      services: ${{ steps.changed.outputs.services }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed services
+        id: changed
+        shell: bash
+        run: |
+          SERVICES=$(
+            git diff --name-only \
+              "${{ github.event.before }}" \
+              "${{ github.sha }}" \
+            | cut -d'/' -f1 \
+            | sort -u \
+            | grep -E '^(backend|admin-backend|frontend)$' \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))'
+          )
+
+          echo "Detected services: $SERVICES"
+
+          echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
+
+  # ============================================================
+  # Build + Scan + Push each changed service
+  # ============================================================
+
+  build-and-push:
+    needs: detect-changes
+
+    if: needs.detect-changes.outputs.services != '[]'
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
+
+    uses: ./.github/workflows/microservice-ci.yaml
+
+    with:
+      service: ${{ matrix.service }}
+
+    secrets: inherit
