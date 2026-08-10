@@ -19,8 +19,4 @@ const emergencyRequestSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-if (mongoose.models && mongoose.models.EmergencyRequest) {
-  delete mongoose.models.EmergencyRequest;
-}
-
-module.exports = mongoose.model("EmergencyRequest", emergencyRequestSchema);
+module.exports = mongoose.models.EmergencyRequest || mongoose.model("EmergencyRequest", emergencyRequestSchema);

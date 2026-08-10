@@ -84,9 +84,6 @@ const bookingSchema = new mongoose.Schema(
   }
 );
 
-// Clear cached Mongoose model if previously registered with restrictive enums
-if (mongoose.models && mongoose.models.Booking) {
-  delete mongoose.models.Booking;
-}
-
-module.exports = mongoose.model("Booking", bookingSchema);
+module.exports =
+  mongoose.models.Booking ||
+  mongoose.model("Booking", bookingSchema);

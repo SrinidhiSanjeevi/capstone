@@ -20,7 +20,7 @@ const professionalSchema = new mongoose.Schema(
     },
     experience: {
       type: Number,
-      required: true // Years of experience
+      required: true
     },
     image: {
       type: String,
@@ -37,4 +37,6 @@ const professionalSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Professional", professionalSchema);
+module.exports =
+  mongoose.models.Professional ||
+  mongoose.model("Professional", professionalSchema);
