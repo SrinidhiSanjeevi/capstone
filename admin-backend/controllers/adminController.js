@@ -34,9 +34,12 @@ const getStats = async (req, res) => {
         .populate("service", "name category"),
     ]);
 
+    // FIX: the Booking schema field is `totalPrice`, not `amount`.
+    // The old query summed a field that doesn't exist, so revenue was
+    // always silently 0.
     const revenueAgg = await Booking.aggregate([
       { $match: { status: { $in: ["confirmed", "completed"] } } },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
+      { $group: { _id: null, total: { $sum: "$totalPrice" } } },
     ]);
     const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
 
@@ -58,7 +61,7 @@ const getStats = async (req, res) => {
     });
   } catch (error) {
     console.error("Admin Stats Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -67,7 +70,8 @@ const getAllUsers = async (req, res) => {
     const users = await User.find().select("-password").sort({ createdAt: -1 });
     res.status(200).json({ success: true, users });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Get All Users Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -79,7 +83,8 @@ const deleteUser = async (req, res) => {
     await User.findByIdAndDelete(req.params.id);
     res.status(200).json({ success: true, message: "User deleted successfully" });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Delete User Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -92,7 +97,8 @@ const getAllBookings = async (req, res) => {
       .populate("professional", "name specialization");
     res.status(200).json({ success: true, bookings });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Get All Bookings Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -112,7 +118,8 @@ const updateBookingStatus = async (req, res) => {
     if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
     res.status(200).json({ success: true, message: `Booking marked as ${status}`, booking });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Update Booking Status Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -121,7 +128,8 @@ const getAllServices = async (req, res) => {
     const services = await Service.find().sort({ category: 1, name: 1 });
     res.status(200).json({ success: true, services });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Get All Services Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -130,7 +138,8 @@ const getAllProfessionals = async (req, res) => {
     const professionals = await Professional.find().sort({ name: 1 });
     res.status(200).json({ success: true, professionals });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Get All Professionals Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -142,7 +151,8 @@ const getAllEmergencies = async (req, res) => {
       .populate("assignedProfessional", "name category experience");
     res.status(200).json({ success: true, emergencies });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Get All Emergencies Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -162,7 +172,8 @@ const updateEmergencyStatus = async (req, res) => {
     await emergency.save();
     res.status(200).json({ success: true, message: `Emergency status updated to ${status}`, emergency });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Update Emergency Status Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -175,7 +186,8 @@ const createService = async (req, res) => {
     const service = await Service.create({ name, category, price, description, image, duration, products: products || [] });
     res.status(201).json({ success: true, message: "Service created successfully", service });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Create Service Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -185,7 +197,8 @@ const updateService = async (req, res) => {
     if (!service) return res.status(404).json({ success: false, message: "Service not found" });
     res.status(200).json({ success: true, message: "Service updated successfully", service });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Update Service Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -195,7 +208,8 @@ const deleteService = async (req, res) => {
     if (!service) return res.status(404).json({ success: false, message: "Service not found" });
     res.status(200).json({ success: true, message: "Service deleted successfully" });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Delete Service Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -208,7 +222,8 @@ const createProfessional = async (req, res) => {
     const professional = await Professional.create({ name, category, experience, image, status: status || "Available" });
     res.status(201).json({ success: true, message: "Professional added successfully", professional });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Create Professional Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -218,7 +233,8 @@ const updateProfessional = async (req, res) => {
     if (!professional) return res.status(404).json({ success: false, message: "Professional not found" });
     res.status(200).json({ success: true, message: "Professional updated successfully", professional });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Update Professional Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
@@ -228,7 +244,8 @@ const deleteProfessional = async (req, res) => {
     if (!professional) return res.status(404).json({ success: false, message: "Professional not found" });
     res.status(200).json({ success: true, message: "Professional deleted successfully" });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Delete Professional Error:", error);
+    res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 

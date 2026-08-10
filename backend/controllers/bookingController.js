@@ -3,15 +3,22 @@ const Service = require("../models/Service");
 const Professional = require("../models/Professional");
 const Payment = require("../models/Payment");
 const Notification = require("../models/Notification");
+
 const {
   processPaymentSimulation,
   processNotificationSimulation,
   processCompletionEmailNotification
 } = require("../services/simulationService");
+
 const metrics = require("../metrics");
 
-// CREATE NEW BOOKING (Directly Auto-Assigns & Confirms - No Admin Approval Needed)
+// ============================================================
+// CREATE NEW BOOKING
+// Directly auto-assigns an available professional
+// ============================================================
 const createBooking = async (req, res) => {
+  let queueIncremented = false;
+
   try {
     const {
       serviceId,
@@ -30,15 +37,26 @@ const createBooking = async (req, res) => {
     } = req.body;
 
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
+      });
     }
 
     const userId = req.user._id;
-    if (metrics && metrics.queueLength) metrics.queueLength.inc();
+
+    // Track booking requests waiting for professional assignment
+    if (metrics && metrics.queueLength) {
+      metrics.queueLength.inc();
+      queueIncremented = true;
+    }
 
     let service = null;
     let professional = null;
 
+    // ==========================================================
+    // Resolve service and professional
+    // ==========================================================
     if (isCustom) {
       professional = await Professional.findOne({
         category: customCategory || "Spa",
@@ -48,9 +66,12 @@ const createBooking = async (req, res) => {
       if (serviceId) {
         service = await Service.findById(serviceId);
       }
-      
+
       if (professionalId) {
-        professional = await Professional.findById(professionalId);
+        professional = await Professional.findOne({
+          _id: professionalId,
+          status: "Available"
+        });
       } else if (service) {
         professional = await Professional.findOne({
           category: service.category,
@@ -59,326 +80,799 @@ const createBooking = async (req, res) => {
       }
     }
 
-    // Derive service type for the Prometheus label (after service is resolved)
+    // ==========================================================
+    // Prometheus booking request metric
+    // ==========================================================
     const serviceType = isCustom
-      ? (customCategory || 'Custom')
-      : (service ? service.category : 'Unknown');
-    if (metrics && metrics.totalBookingRequests) metrics.totalBookingRequests.labels(serviceType).inc();
+      ? customCategory || "Custom"
+      : service
+        ? service.category
+        : "Unknown";
 
+    if (metrics && metrics.totalBookingRequests) {
+      metrics.totalBookingRequests
+        .labels(serviceType)
+        .inc();
+    }
+
+    // Queue assignment completed
+    if (metrics && metrics.queueLength && queueIncremented) {
+      metrics.queueLength.dec();
+      queueIncremented = false;
+    }
+
+    // ==========================================================
+    // Mark professional as busy
+    // ==========================================================
     if (professional) {
       professional.status = "Busy";
       await professional.save();
     }
 
-    // Normalize payment method label to an internal safe value
-    const rawPaymentMethod = paymentMethod || "Online Payment (Simulated)";
+    // ==========================================================
+    // Normalize payment method
+    // ==========================================================
+    const rawPaymentMethod =
+      paymentMethod || "Online Payment (Simulated)";
+
+    const normalizedRawPaymentMethod =
+      String(rawPaymentMethod).trim();
+
     const isCash =
-      rawPaymentMethod === "Cash" ||
-      rawPaymentMethod === "Cash on Delivery" ||
-      rawPaymentMethod.toLowerCase().includes("cash");
+      normalizedRawPaymentMethod === "Cash" ||
+      normalizedRawPaymentMethod === "Cash on Delivery" ||
+      normalizedRawPaymentMethod.toLowerCase().includes("cash");
 
-    // Map UI labels → internal stored value
-    let normalizedPaymentMethod;
-    if (isCash) {
-      normalizedPaymentMethod = "Cash on Delivery";
-    } else {
-      normalizedPaymentMethod = "Online Payment (Simulated)";
-    }
+    const normalizedPaymentMethod = isCash
+      ? "Cash on Delivery"
+      : "Online Payment (Simulated)";
 
-    // Create initial booking
+    const bookingAmount =
+      Number(totalPrice) > 0 ? Number(totalPrice) : 500;
+
+    // ==========================================================
+    // Create booking
+    // ==========================================================
     const booking = await Booking.create({
       user: userId,
-      service: isCustom ? null : (serviceId || null),
+
+      service: isCustom
+        ? null
+        : service
+          ? service._id
+          : null,
+
       isCustom: !!isCustom,
-      customCategory: customCategory || null,
-      customDescription: customDescription || null,
-      professional: professional ? professional._id : null,
-      date: date ? new Date(date) : new Date(),
-      timeSlot: timeSlot || "09:00 AM - 11:00 AM",
-      address: address || "Default Address",
-      contactNumber: contactNumber || "0000000000",
-      notes: notes || "",
-      selectedProduct: selectedProduct || null,
-      paymentMethod: normalizedPaymentMethod,
-      paymentStatus: isCash ? "Pending (Cash on Delivery)" : "Pending",
-      status: professional ? "Confirmed" : "Assigned",
-      totalPrice: totalPrice || 500
+
+      customCategory:
+        customCategory || null,
+
+      customDescription:
+        customDescription || null,
+
+      professional:
+        professional
+          ? professional._id
+          : null,
+
+      date:
+        date
+          ? new Date(date)
+          : new Date(),
+
+      timeSlot:
+        timeSlot || "09:00 AM - 11:00 AM",
+
+      address:
+        address || "Default Address",
+
+      contactNumber:
+        contactNumber || "0000000000",
+
+      notes:
+        notes || "",
+
+      selectedProduct:
+        selectedProduct || null,
+
+      paymentMethod:
+        normalizedPaymentMethod,
+
+      paymentStatus:
+        isCash
+          ? "Pending (Cash on Delivery)"
+          : "Pending",
+
+      status:
+        professional
+          ? "Confirmed"
+          : "Assigned",
+
+      totalPrice:
+        bookingAmount
     });
 
-    if (metrics && metrics.queueLength) metrics.queueLength.dec();
-
-    // Process Payment Simulation
-    const { success: paymentSuccess, payment } = await processPaymentSimulation(
+    // ==========================================================
+    // Process payment simulation
+    // ==========================================================
+    const {
+      success: paymentSuccess,
+      payment
+    } = await processPaymentSimulation(
       booking,
       userId,
-      totalPrice || 500,
-      paymentMethod || "Online Payment (Simulated)"
+      bookingAmount,
+      normalizedPaymentMethod
     );
 
-    let notifications = [];
     if (paymentSuccess) {
-      booking.paymentStatus = isCash ? "Pending (Cash on Delivery)" : "Paid";
+      booking.paymentStatus =
+        isCash
+          ? "Pending (Cash on Delivery)"
+          : "Paid";
+
       booking.status = "Confirmed";
-      if (metrics && metrics.bookingsConfirmed) metrics.bookingsConfirmed.inc();
+
+      if (metrics && metrics.bookingsConfirmed) {
+        metrics.bookingsConfirmed.inc();
+      }
+
+      // Only successful bookings become active
+      if (metrics && metrics.activeBookings) {
+        metrics.activeBookings.inc();
+      }
     } else {
       booking.paymentStatus = "Failed";
       booking.status = "Cancelled";
-      if (metrics && metrics.bookingsCancelled) metrics.bookingsCancelled.inc();
+
+      if (metrics && metrics.bookingsCancelled) {
+        metrics.bookingsCancelled.inc();
+      }
+
+      // Release professional if payment failed
       if (professional) {
         professional.status = "Available";
         await professional.save();
       }
     }
 
-    // Send confirmation email asynchronously in background so response returns instantly (no blocking UX delay)
-    processNotificationSimulation(booking, userId).catch((emailErr) => {
-      console.error("Background email notification error:", emailErr.message);
+    // ==========================================================
+    // Background notification
+    // Do not block booking response
+    // ==========================================================
+    processNotificationSimulation(
+      booking,
+      userId
+    ).catch((notificationError) => {
+      console.error(
+        "Background email notification error:",
+        notificationError.message
+      );
     });
 
     await booking.save();
-    if (metrics && metrics.activeBookings) metrics.activeBookings.inc();
 
-    res.status(201).json({
-      success: true,
+    const notifications = [];
+
+    return res.status(201).json({
+      success: paymentSuccess,
+
       message: paymentSuccess
-        ? (isCash ? "Booking confirmed! Payment will be collected in cash upon service completion." : "Booking created & payment confirmed!")
+        ? (
+            isCash
+              ? "Booking confirmed! Payment will be collected in cash upon service completion."
+              : "Booking created & payment confirmed!"
+          )
         : "Booking failed due to online payment simulation error.",
+
       booking,
       payment,
       notifications
     });
+
   } catch (error) {
-    console.error("CREATE BOOKING ERROR:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(
+      "CREATE BOOKING ERROR:",
+      error
+    );
+
+    // Make sure queue metric never gets stuck
+    if (
+      metrics &&
+      metrics.queueLength &&
+      queueIncremented
+    ) {
+      metrics.queueLength.dec();
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong, please try again"
+    });
   }
 };
 
-// GET USER BOOKINGS WITH PAYMENTS & NOTIFICATIONS
+
+// ============================================================
+// GET USER BOOKINGS
+// Includes payment and notification history
+// ============================================================
 const getUserBookings = async (req, res) => {
   try {
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
+      });
     }
 
     const userId = req.user._id;
-    const bookings = await Booking.find({ user: userId })
+
+    const bookings = await Booking.find({
+      user: userId
+    })
       .populate("service")
       .populate("professional")
       .sort({ createdAt: -1 })
       .lean();
 
     const enrichedBookings = await Promise.all(
-      (bookings || []).map(async (b) => {
+      (bookings || []).map(async (booking) => {
         try {
-          const payments = await Payment.find({ booking: b._id }).sort({ createdAt: -1 });
-          const notifications = await Notification.find({ booking: b._id }).sort({ createdAt: -1 });
-          return { ...b, payments: payments || [], notifications: notifications || [] };
-        } catch (err) {
-          return { ...b, payments: [], notifications: [] };
+          const [
+            payments,
+            notifications
+          ] = await Promise.all([
+            Payment.find({
+              booking: booking._id
+            })
+              .sort({ createdAt: -1 })
+              .lean(),
+
+            Notification.find({
+              booking: booking._id
+            })
+              .sort({ createdAt: -1 })
+              .lean()
+          ]);
+
+          return {
+            ...booking,
+            payments: payments || [],
+            notifications: notifications || []
+          };
+
+        } catch (error) {
+          console.error(
+            "BOOKING HISTORY ENRICHMENT ERROR:",
+            error.message
+          );
+
+          return {
+            ...booking,
+            payments: [],
+            notifications: []
+          };
         }
       })
     );
 
-    res.status(200).json({ success: true, bookings: enrichedBookings });
+    return res.status(200).json({
+      success: true,
+      bookings: enrichedBookings
+    });
+
   } catch (error) {
-    console.error("GET USER BOOKINGS ERROR:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(
+      "GET USER BOOKINGS ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong, please try again"
+    });
   }
 };
 
+
+// ============================================================
 // GET ASSIGNED BOOKINGS FOR PROFESSIONAL
+// ============================================================
 const getProfessionalBookings = async (req, res) => {
   try {
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "User not authenticated" });
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
+      });
     }
 
     const userId = req.user._id;
-    let pro = await Professional.findOne({ user: userId });
-    
-    let query = pro ? { professional: pro._id } : { professional: { $ne: null } };
 
-    const bookings = await Booking.find(query)
+    // Find professional profile belonging to logged-in user
+    const professional = await Professional.findOne({
+      user: userId
+    });
+
+    // IMPORTANT:
+    // Do NOT return all bookings when the user is not a professional.
+    if (!professional) {
+      return res.status(200).json({
+        success: true,
+        bookings: []
+      });
+    }
+
+    const bookings = await Booking.find({
+      professional: professional._id
+    })
       .populate("service")
-      .populate("user", "name email phone address")
+      .populate(
+        "user",
+        "name email phone address"
+      )
       .sort({ createdAt: -1 })
       .lean();
 
     const enrichedBookings = await Promise.all(
-      (bookings || []).map(async (b) => {
+      (bookings || []).map(async (booking) => {
         try {
-          const payments = await Payment.find({ booking: b._id });
-          const notifications = await Notification.find({ booking: b._id });
-          return { ...b, payments: payments || [], notifications: notifications || [] };
-        } catch (err) {
-          return { ...b, payments: [], notifications: [] };
+          const [
+            payments,
+            notifications
+          ] = await Promise.all([
+            Payment.find({
+              booking: booking._id
+            }).lean(),
+
+            Notification.find({
+              booking: booking._id
+            }).lean()
+          ]);
+
+          return {
+            ...booking,
+            payments: payments || [],
+            notifications: notifications || []
+          };
+
+        } catch (error) {
+          console.error(
+            "PROFESSIONAL BOOKING ENRICHMENT ERROR:",
+            error.message
+          );
+
+          return {
+            ...booking,
+            payments: [],
+            notifications: []
+          };
         }
       })
     );
 
-    res.status(200).json({ success: true, bookings: enrichedBookings });
+    return res.status(200).json({
+      success: true,
+      bookings: enrichedBookings
+    });
+
   } catch (error) {
-    console.error("GET PROFESSIONAL BOOKINGS ERROR:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(
+      "GET PROFESSIONAL BOOKINGS ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong, please try again"
+    });
   }
 };
 
+
+// ============================================================
 // ACCEPT BOOKING
+// Professional can accept only their own booking
+// ============================================================
 const acceptBooking = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const booking = await Booking.findById(id);
-    if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
+      });
     }
 
-    if (booking.status === "Cancelled" || booking.status === "Completed") {
-      return res.status(400).json({ success: false, message: `Cannot accept booking in ${booking.status} status` });
+    const professional = await Professional.findOne({
+      user: req.user._id
+    });
+
+    if (!professional) {
+      return res.status(403).json({
+        success: false,
+        message: "Professional access required"
+      });
+    }
+
+    const { id } = req.params;
+
+    const booking = await Booking.findOne({
+      _id: id,
+      professional: professional._id
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found"
+      });
+    }
+
+    if (
+      booking.status === "Cancelled" ||
+      booking.status === "Completed"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          `Cannot accept booking in ${booking.status} status`
+      });
     }
 
     booking.status = "Confirmed";
-    if (booking.paymentMethod === "Cash" || booking.paymentMethod === "Cash on Delivery") {
-      booking.paymentStatus = "Pending (Cash on Delivery)";
+
+    if (
+      booking.paymentMethod === "Cash" ||
+      booking.paymentMethod === "Cash on Delivery"
+    ) {
+      booking.paymentStatus =
+        "Pending (Cash on Delivery)";
     } else {
       booking.paymentStatus = "Paid";
     }
 
     await booking.save();
-    if (metrics && metrics.bookingsConfirmed) metrics.bookingsConfirmed.inc();
 
-    res.status(200).json({
+    if (metrics && metrics.bookingsConfirmed) {
+      metrics.bookingsConfirmed.inc();
+    }
+
+    return res.status(200).json({
       success: true,
       message: "Booking accepted & confirmed!",
       booking
     });
+
   } catch (error) {
-    console.error("ACCEPT BOOKING ERROR:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(
+      "ACCEPT BOOKING ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong, please try again"
+    });
   }
 };
 
-// COMPLETE BOOKING (MARK COMPLETED & DISPATCH COMPLETION EMAIL)
+
+// ============================================================
+// COMPLETE BOOKING
+// Professional can complete only their own booking
+// ============================================================
 const completeBooking = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
+      });
+    }
+
+    const professional = await Professional.findOne({
+      user: req.user._id
+    });
+
+    if (!professional) {
+      return res.status(403).json({
+        success: false,
+        message: "Professional access required"
+      });
+    }
+
     const { id } = req.params;
 
-    const booking = await Booking.findById(id);
+    const booking = await Booking.findOne({
+      _id: id,
+      professional: professional._id
+    });
+
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found"
+      });
     }
 
     if (booking.status === "Cancelled") {
-      return res.status(400).json({ success: false, message: "Cannot complete a cancelled booking" });
+      return res.status(400).json({
+        success: false,
+        message:
+          "Cannot complete a cancelled booking"
+      });
+    }
+
+    if (booking.status === "Completed") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Booking is already completed"
+      });
     }
 
     booking.status = "Completed";
-    
-    if (booking.paymentMethod === "Cash" || booking.paymentMethod === "Cash on Delivery") {
-      booking.paymentStatus = "Paid (Cash Collected)";
+
+    if (
+      booking.paymentMethod === "Cash" ||
+      booking.paymentMethod === "Cash on Delivery"
+    ) {
+      booking.paymentStatus =
+        "Paid (Cash Collected)";
     } else {
       booking.paymentStatus = "Paid";
     }
 
     await booking.save();
 
-    if (booking.professional) {
-      await Professional.findByIdAndUpdate(booking.professional, { status: "Available" });
+    // Release professional
+    await Professional.findByIdAndUpdate(
+      professional._id,
+      {
+        status: "Available"
+      }
+    );
+
+    // Send completion email asynchronously
+    processCompletionEmailNotification(
+      booking,
+      booking.user
+    ).catch((emailError) => {
+      console.error(
+        "Background completion email error:",
+        emailError.message
+      );
+    });
+
+    if (metrics && metrics.bookingsCompleted) {
+      metrics.bookingsCompleted.inc();
     }
 
-    // Send completion email asynchronously in background
-    processCompletionEmailNotification(booking, booking.user).catch((err) => {
-      console.error("Background completion email error:", err.message);
-    });
+    if (metrics && metrics.activeBookings) {
+      metrics.activeBookings.dec();
+    }
 
-    if (metrics && metrics.bookingsCompleted) metrics.bookingsCompleted.inc();
-    if (metrics && metrics.activeBookings) metrics.activeBookings.dec();
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "Service marked as COMPLETED! Completion email sent to customer email.",
+      message:
+        "Service marked as COMPLETED! Completion email sent to customer email.",
       booking
     });
+
   } catch (error) {
-    console.error("COMPLETE BOOKING ERROR:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(
+      "COMPLETE BOOKING ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong, please try again"
+    });
   }
 };
 
+
+// ============================================================
 // CANCEL BOOKING
+// Customer can cancel only their own booking
+// ============================================================
 const cancelBooking = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const booking = await Booking.findById(id);
-    if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
+      });
     }
 
-    if (booking.status === "Cancelled" || booking.status === "Completed") {
+    const { id } = req.params;
+
+    const booking = await Booking.findOne({
+      _id: id,
+      user: req.user._id
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found"
+      });
+    }
+
+    if (
+      booking.status === "Cancelled" ||
+      booking.status === "Completed"
+    ) {
       return res.status(400).json({
         success: false,
-        message: `Booking cannot be cancelled. Current status is ${booking.status}`
+        message:
+          `Booking cannot be cancelled. Current status is ${booking.status}`
       });
     }
 
     booking.status = "Cancelled";
+
     await booking.save();
 
     if (booking.professional) {
-      await Professional.findByIdAndUpdate(booking.professional, { status: "Available" });
+      await Professional.findByIdAndUpdate(
+        booking.professional,
+        {
+          status: "Available"
+        }
+      );
     }
 
-    if (metrics && metrics.bookingsCancelled) metrics.bookingsCancelled.inc();
-    if (metrics && metrics.activeBookings) metrics.activeBookings.dec();
+    if (metrics && metrics.bookingsCancelled) {
+      metrics.bookingsCancelled.inc();
+    }
 
-    res.status(200).json({ success: true, message: "Booking cancelled successfully", booking });
+    if (metrics && metrics.activeBookings) {
+      metrics.activeBookings.dec();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Booking cancelled successfully",
+      booking
+    });
+
   } catch (error) {
-    console.error("CANCEL BOOKING ERROR:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(
+      "CANCEL BOOKING ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong, please try again"
+    });
   }
 };
 
+
+// ============================================================
 // RATE AND REVIEW BOOKING
+// Customer can rate only their own completed booking
+// ============================================================
 const rateBooking = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated"
+      });
+    }
+
     const { id } = req.params;
     const { rating, review } = req.body;
     const userId = req.user._id;
 
-    if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ success: false, message: "Invalid rating value (1-5)" });
+    const numericRating = Number(rating);
+
+    if (
+      !Number.isFinite(numericRating) ||
+      numericRating < 1 ||
+      numericRating > 5
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid rating value (1-5)"
+      });
     }
 
-    const booking = await Booking.findOne({ _id: id, user: userId });
+    const booking = await Booking.findOne({
+      _id: id,
+      user: userId
+    });
+
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found"
+      });
     }
 
-    booking.userRating = rating;
-    booking.userReview = review || "";
+    if (booking.status !== "Completed") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Only completed bookings can be rated"
+      });
+    }
+
+    // Prevent duplicate rating from inflating service rating
+    if (booking.userRating) {
+      return res.status(400).json({
+        success: false,
+        message: "This booking has already been rated"
+      });
+    }
+
+    booking.userRating = numericRating;
+    booking.userReview =
+      typeof review === "string"
+        ? review.trim()
+        : "";
+
     await booking.save();
 
+    // Update service rating
     if (booking.service) {
-      const service = await Service.findById(booking.service);
-      if (service) {
-        const currentTotalRatings = service.rating * service.numRatings;
-        const newNumRatings = service.numRatings + 1;
-        const newAverageRating = (currentTotalRatings + rating) / newNumRatings;
+      const service = await Service.findById(
+        booking.service
+      );
 
-        service.rating = Math.round(newAverageRating * 10) / 10;
-        service.numRatings = newNumRatings;
+      if (service) {
+        const currentTotalRatings =
+          service.rating * service.numRatings;
+
+        const newNumRatings =
+          service.numRatings + 1;
+
+        const newAverageRating =
+          (
+            currentTotalRatings +
+            numericRating
+          ) / newNumRatings;
+
+        service.rating =
+          Math.round(
+            newAverageRating * 10
+          ) / 10;
+
+        service.numRatings =
+          newNumRatings;
+
         await service.save();
       }
     }
 
-    res.status(200).json({ success: true, message: "Thank you for your rating!", booking });
+    return res.status(200).json({
+      success: true,
+      message: "Thank you for your rating!",
+      booking
+    });
+
   } catch (error) {
-    console.error("RATE BOOKING ERROR:", error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error(
+      "RATE BOOKING ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong, please try again"
+    });
   }
 };
 
+
+// ============================================================
+// EXPORT CONTROLLERS
+// ============================================================
 module.exports = {
   createBooking,
   getUserBookings,
