@@ -33,3 +33,10 @@ desktop.ini
 
 # Docker
 .dockerignore
+
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
