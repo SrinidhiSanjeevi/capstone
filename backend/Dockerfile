@@ -1,12 +1,18 @@
+# ================================
+# Stage 1: Production dependencies
+# ================================
 FROM node:22-alpine AS deps
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY package.json package-lock.json ./
 
 RUN npm ci --omit=dev --no-audit --no-fund
 
 
+# ================================
+# Stage 2: Production runtime
+# ================================
 FROM node:22-alpine AS runtime
 
 RUN apk add --no-cache \
@@ -21,13 +27,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=deps --chown=homeease:nodejs /app/node_modules ./node_modules
+
 COPY --chown=homeease:nodejs . .
 
 USER homeease
 
 EXPOSE 5000
 
-HEALTHCHECK --interval=30s \
+HEALTHCHECK \
+    --interval=30s \
     --timeout=10s \
     --start-period=20s \
     --retries=3 \
