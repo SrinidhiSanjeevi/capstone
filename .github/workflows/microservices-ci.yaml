@@ -14,6 +14,7 @@ permissions:
   contents: read
 
 jobs:
+
   detect-changes:
     runs-on: ubuntu-latest
 
@@ -30,16 +31,29 @@ jobs:
         id: changed
         shell: bash
         run: |
-          SERVICES=$(
-            git diff --name-only \
-              "${{ github.event.before }}" \
-              "${{ github.sha }}" \
-            | cut -d'/' -f1 \
-            | sort -u \
-            | grep -E '^(backend|admin-backend|frontend)$' \
-            | jq -R -s -c 'split("\n") | map(select(length > 0))' \
-            || echo '[]'
-          )
+          CHANGED_FILES=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
+
+          SERVICES="[]"
+
+          if echo "$CHANGED_FILES" | grep -q '^backend/'; then
+            SERVICES='["backend"]'
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^admin-backend/'; then
+            if [ "$SERVICES" = "[]" ]; then
+              SERVICES='["admin-backend"]'
+            else
+              SERVICES=$(echo "$SERVICES" | sed 's/]$/, "admin-backend"]/')
+            fi
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q '^frontend/'; then
+            if [ "$SERVICES" = "[]" ]; then
+              SERVICES='["frontend"]'
+            else
+              SERVICES=$(echo "$SERVICES" | sed 's/]$/, "frontend"]/')
+            fi
+          fi
 
           echo "Detected services: $SERVICES"
           echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
