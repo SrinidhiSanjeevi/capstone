@@ -8,15 +8,15 @@ on:
       - "backend/**"
       - "admin-backend/**"
       - "frontend/**"
+      - ".github/workflows/**"
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
 
   # ============================================================
-  # Detect which service changed
+  # Detect which services changed
   # ============================================================
 
   detect-changes:
@@ -26,6 +26,7 @@ jobs:
       services: ${{ steps.changed.outputs.services }}
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -35,6 +36,7 @@ jobs:
         id: changed
         shell: bash
         run: |
+
           SERVICES=$(
             git diff --name-only \
               "${{ github.event.before }}" \
@@ -42,12 +44,14 @@ jobs:
             | cut -d'/' -f1 \
             | sort -u \
             | grep -E '^(backend|admin-backend|frontend)$' \
-            | jq -R -s -c 'split("\n") | map(select(length > 0))'
+            | jq -R -s -c 'split("\n") | map(select(length > 0))' \
+            || echo '[]'
           )
 
           echo "Detected services: $SERVICES"
 
           echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
+
 
   # ============================================================
   # Build + Scan + Push each changed service
