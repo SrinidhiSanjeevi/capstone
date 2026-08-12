@@ -49,3 +49,13 @@ variable "aks_vm_size" {
   type        = string
   default     = "Standard_D2s_v5"
 }
+
+variable "key_vault_name" {
+  description = "Globally unique Azure Key Vault name"
+  type        = string
+}
+
+variable "tenant_id" {
+  description = "Azure tenant ID"
+  type        = string
+}

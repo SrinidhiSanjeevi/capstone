@@ -1,8 +1,6 @@
 const EmergencyRequest = require("../models/EmergencyRequest");
 const Professional = require("../models/Professional");
 
-// ─── Severity → Emergency Services Mapping ────────────────────────────────────
-// Based on severity, determines whether fire engine / govt emergency is dispatched
 const SEVERITY_CONFIG = {
   Low: {
     fireEngineDispatched: false,
@@ -34,7 +32,6 @@ const SEVERITY_CONFIG = {
   }
 };
 
-// ─── Category → Recommended Severity ──────────────────────────────────────────
 const CATEGORY_DEFAULT_SEVERITY = {
   Electrical: "High",
   Fire: "Critical",
@@ -46,24 +43,10 @@ const CATEGORY_DEFAULT_SEVERITY = {
 // DISPATCH EMERGENCY SERVICE
 const dispatchEmergency = async (req, res) => {
   try {
-    const {
-      category,
-      severity,
-      description,
-      contactNumber,
-      address
-    } = req.body;
-
+    const { category, severity, description, contactNumber, address } = req.body;
     const userId = req.user._id;
 
-    const validCategories = [
-      "Electrical",
-      "Plumbing",
-      "Security",
-      "Fire",
-      "Medical"
-    ];
-
+    const validCategories = ["Electrical", "Plumbing", "Security", "Fire", "Medical"];
     if (!category || !validCategories.includes(category)) {
       return res.status(400).json({
         success: false,
@@ -71,19 +54,8 @@ const dispatchEmergency = async (req, res) => {
       });
     }
 
-    // Use provided severity or auto-detect from category
-    const resolvedSeverity =
-      severity ||
-      CATEGORY_DEFAULT_SEVERITY[category] ||
-      "Medium";
-
-    const validSeverities = [
-      "Low",
-      "Medium",
-      "High",
-      "Critical"
-    ];
-
+    const resolvedSeverity = severity || CATEGORY_DEFAULT_SEVERITY[category] || "Medium";
+    const validSeverities = ["Low", "Medium", "High", "Critical"];
     if (!validSeverities.includes(resolvedSeverity)) {
       return res.status(400).json({
         success: false,
@@ -93,12 +65,8 @@ const dispatchEmergency = async (req, res) => {
 
     const severityConfig = SEVERITY_CONFIG[resolvedSeverity];
 
-    // Find highest-rated available professional for this category
     const professional = await Professional.findOne({
-      category:
-        category === "Fire" || category === "Medical"
-          ? "Electrical"
-          : category,
+      category: category === "Fire" || category === "Medical" ? "Electrical" : category,
       status: "Available"
     }).sort({ rating: -1 });
 
@@ -107,7 +75,6 @@ const dispatchEmergency = async (req, res) => {
       await professional.save();
     }
 
-    // Build emergency record
     const emergency = await EmergencyRequest.create({
       user: userId,
       category,
@@ -116,25 +83,15 @@ const dispatchEmergency = async (req, res) => {
       contactNumber,
       address,
       status: "Dispatched",
-      assignedProfessional: professional
-        ? professional._id
-        : null,
-      fireEngineDispatched:
-        severityConfig.fireEngineDispatched,
-      fireEngineNumber:
-        severityConfig.fireEngineNumber,
-      emergencyServiceNumber:
-        severityConfig.emergencyServiceNumber,
-      estimatedArrivalMinutes:
-        severityConfig.estimatedArrivalMinutes
+      assignedProfessional: professional ? professional._id : null,
+      fireEngineDispatched: severityConfig.fireEngineDispatched,
+      fireEngineNumber: severityConfig.fireEngineNumber,
+      emergencyServiceNumber: severityConfig.emergencyServiceNumber,
+      estimatedArrivalMinutes: severityConfig.estimatedArrivalMinutes
     });
 
-    // Populate professional for response
-    const populatedEmergency =
-      await EmergencyRequest.findById(emergency._id)
-        .populate("assignedProfessional");
+    const populatedEmergency = await EmergencyRequest.findById(emergency._id).populate("assignedProfessional");
 
-    // Build response message
     let message = professional
       ? `Emergency dispatched! Assigned provider: ${professional.name}.`
       : "Emergency requested! Searching for an available nearby provider...";
@@ -144,7 +101,6 @@ const dispatchEmergency = async (req, res) => {
     } else if (severityConfig.emergencyServiceNumber) {
       message += ` Helpline: ${severityConfig.emergencyServiceNumber}.`;
     }
-
     message += ` ETA: ~${severityConfig.estimatedArrivalMinutes} minutes.`;
 
     return res.status(201).json({
@@ -152,178 +108,97 @@ const dispatchEmergency = async (req, res) => {
       message,
       severity: resolvedSeverity,
       severityLabel: severityConfig.label,
-      fireEngineDispatched:
-        severityConfig.fireEngineDispatched,
-      fireEngineNumber:
-        severityConfig.fireEngineNumber,
-      emergencyServiceNumber:
-        severityConfig.emergencyServiceNumber,
-      estimatedArrivalMinutes:
-        severityConfig.estimatedArrivalMinutes,
+      fireEngineDispatched: severityConfig.fireEngineDispatched,
+      fireEngineNumber: severityConfig.fireEngineNumber,
+      emergencyServiceNumber: severityConfig.emergencyServiceNumber,
+      estimatedArrivalMinutes: severityConfig.estimatedArrivalMinutes,
       emergency: populatedEmergency
     });
   } catch (error) {
-    console.error(
-      "EMERGENCY DISPATCH ERROR:",
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong, please try again"
-    });
+    console.error("EMERGENCY DISPATCH ERROR:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
-// UPDATE EMERGENCY STATUS
-// OnTheWay → Arrived → Resolved
-const updateEmergencyStatus = async (req, res) => {
+// CANCEL EMERGENCY REQUEST
+// FIX: replaces the old updateEmergencyStatus, which had NO
+// ownership check — any authenticated user could change the status
+// of any other user's emergency by ID. Customers may now only
+// cancel their own, non-resolved/non-cancelled request. Full status
+// control (OnTheWay/Arrived/Resolved) is admin-only — see
+// admin-backend's adminController.updateEmergencyStatus.
+const cancelEmergency = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ success: false, message: "User not authenticated" });
+    }
+
     const { id } = req.params;
-    const { status } = req.body;
-
-    const validStatuses = [
-      "OnTheWay",
-      "Arrived",
-      "Resolved",
-      "Cancelled"
-    ];
-
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid status. Must be one of: ${validStatuses.join(", ")}.`
-      });
-    }
-
-    const emergency =
-      await EmergencyRequest.findById(id);
-
+    const emergency = await EmergencyRequest.findOne({ _id: id, user: req.user._id });
     if (!emergency) {
-      return res.status(404).json({
-        success: false,
-        message: "Emergency request not found"
-      });
+      return res.status(404).json({ success: false, message: "Emergency request not found" });
     }
 
-    if (
-      emergency.status === "Resolved" ||
-      emergency.status === "Cancelled"
-    ) {
+    if (emergency.status === "Resolved" || emergency.status === "Cancelled") {
       return res.status(400).json({
         success: false,
-        message:
-          `Cannot update an emergency that is already ${emergency.status}.`
+        message: `Cannot cancel an emergency that is already ${emergency.status}.`
       });
     }
 
-    emergency.status = status;
-
-    if (status === "Resolved") {
-      emergency.resolvedAt = new Date();
-
-      // Free up the professional
-      if (emergency.assignedProfessional) {
-        await Professional.findByIdAndUpdate(
-          emergency.assignedProfessional,
-          {
-            status: "Available"
-          }
-        );
-      }
+    emergency.status = "Cancelled";
+    if (emergency.assignedProfessional) {
+      await Professional.findByIdAndUpdate(emergency.assignedProfessional, { status: "Available" });
     }
-
     await emergency.save();
 
-    const populatedEmergency =
-      await EmergencyRequest.findById(emergency._id)
-        .populate("assignedProfessional");
+    const populatedEmergency = await EmergencyRequest.findById(emergency._id).populate("assignedProfessional");
 
     return res.status(200).json({
       success: true,
-      message:
-        `Emergency status updated to: ${status}`,
+      message: "Emergency request cancelled",
       emergency: populatedEmergency
     });
   } catch (error) {
-    console.error(
-      "UPDATE EMERGENCY STATUS ERROR:",
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong, please try again"
-    });
+    console.error("CANCEL EMERGENCY ERROR:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
 // GET ACTIVE EMERGENCIES FOR USER
-// All non-resolved/non-cancelled emergencies
 const getActiveEmergencies = async (req, res) => {
   try {
     const userId = req.user._id;
-
-    const emergencies =
-      await EmergencyRequest.find({
-        user: userId,
-        status: {
-          $nin: ["Resolved", "Cancelled"]
-        }
-      })
-        .populate("assignedProfessional")
-        .sort({ createdAt: -1 });
-
-    return res.status(200).json({
-      success: true,
-      emergencies
-    });
+    const emergencies = await EmergencyRequest.find({
+      user: userId,
+      status: { $nin: ["Resolved", "Cancelled"] }
+    })
+      .populate("assignedProfessional")
+      .sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, emergencies });
   } catch (error) {
-    console.error(
-      "GET EMERGENCIES ERROR:",
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong, please try again"
-    });
+    console.error("GET EMERGENCIES ERROR:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
 // GET ALL EMERGENCIES FOR USER
-// Includes emergency history
 const getAllEmergencies = async (req, res) => {
   try {
     const userId = req.user._id;
-
-    const emergencies =
-      await EmergencyRequest.find({
-        user: userId
-      })
-        .populate("assignedProfessional")
-        .sort({ createdAt: -1 });
-
-    return res.status(200).json({
-      success: true,
-      emergencies
-    });
+    const emergencies = await EmergencyRequest.find({ user: userId })
+      .populate("assignedProfessional")
+      .sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, emergencies });
   } catch (error) {
-    console.error(
-      "GET ALL EMERGENCIES ERROR:",
-      error
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: "Something went wrong, please try again"
-    });
+    console.error("GET ALL EMERGENCIES ERROR:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong, please try again" });
   }
 };
 
 module.exports = {
   dispatchEmergency,
-  updateEmergencyStatus,
+  cancelEmergency,
   getActiveEmergencies,
   getAllEmergencies
 };

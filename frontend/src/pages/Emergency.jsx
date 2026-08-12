@@ -48,27 +48,26 @@ export default function Emergency({ activeEmergencies, onDispatchEmergency, show
     setAddress("");
   };
 
-  const handleCancel = async (id) => {
-    if (!window.confirm("Cancel this emergency request?")) return;
-    setCancellingId(id);
-    try {
-      const res = await fetch(`/api/emergency/${id}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status: "Cancelled" })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        showToast("Emergency request cancelled", "success");
-        window.location.reload();
-      } else {
-        showToast(data.message || "Failed to cancel", "error");
-      }
-    } catch {
-      showToast("Server error", "error");
+ const handleCancel = async (id) => {
+  if (!window.confirm("Cancel this emergency request?")) return;
+  setCancellingId(id);
+  try {
+    const res = await fetch(`/api/emergency/${id}/cancel`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      showToast("Emergency request cancelled", "success");
+      window.location.reload();
+    } else {
+      showToast(data.message || "Failed to cancel", "error");
     }
-    setCancellingId(null);
-  };
+  } catch {
+    showToast("Server error", "error");
+  }
+  setCancellingId(null);
+};
 
   const sev = SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.Medium;
 

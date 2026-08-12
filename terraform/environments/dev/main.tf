@@ -42,3 +42,20 @@ module "aks" {
   vm_size             = var.aks_vm_size
   tags                = var.tags
 }
+
+module "keyvault" {
+  source = "../../modules/keyvault"
+
+  name                = var.key_vault_name
+  location            = module.resource_group.location
+  resource_group_name = module.resource_group.name
+  tenant_id           = var.tenant_id
+
+  tags = {
+    project     = "homeease"
+    environment = "dev"
+    managed_by  = "terraform"
+  }
+
+  depends_on = [module.resource_group]
+}

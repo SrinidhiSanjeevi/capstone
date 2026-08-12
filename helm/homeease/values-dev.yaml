@@ -1,0 +1,38 @@
+replicaCount:
+  backend: 1
+  adminBackend: 1
+  frontend: 1
+
+images:
+  backend:
+    repository: acrhomeeasedev.azurecr.io/homeease-backend
+    tag: latest
+
+  adminBackend:
+    repository: acrhomeeasedev.azurecr.io/homeease-admin-backend
+    tag: latest
+
+  frontend:
+    repository: acrhomeeasedev.azurecr.io/homeease-frontend
+    tag: latest
+
+ingress:
+  enabled: false
+
+autoscaling:
+  backend:
+    enabled: false
+
+  adminBackend:
+    enabled: false
+
+  frontend:
+    enabled: false
+
+secrets:
+  keyVault:
+    enabled: true
+    secretProviderClass: homeease-secrets
+
+monitoring:
+  enabled: false

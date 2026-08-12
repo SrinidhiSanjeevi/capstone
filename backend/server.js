@@ -4,7 +4,7 @@ const cors = require("cors");
 
 const connectDB = require("./config/db");
 const metrics = require("./metrics");
-const { startSimulator } = require("./services/bookingSimulator");
+
 
 dotenv.config();
 
@@ -45,6 +45,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   
-  // Start the booking simulator for Prometheus metrics
-  startSimulator();
+ 
 });

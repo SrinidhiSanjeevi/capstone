@@ -10,3 +10,7 @@ tags = {
   environment = "dev"
   managed_by  = "terraform"
 }
+
+
+key_vault_name = "kv-homeease-dev-001"
+tenant_id      = "25ea82b6-dfae-45a3-8712-f925d1b3397d"
