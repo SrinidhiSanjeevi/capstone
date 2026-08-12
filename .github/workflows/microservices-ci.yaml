@@ -12,8 +12,13 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
+
+  # ==============================================================
+  # DETECT CHANGED SERVICES
+  # ==============================================================
 
   detect-changes:
     runs-on: ubuntu-latest
@@ -22,6 +27,7 @@ jobs:
       services: ${{ steps.changed.outputs.services }}
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -31,40 +37,78 @@ jobs:
         id: changed
         shell: bash
         run: |
-          CHANGED_FILES=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
+
+          echo "Checking changed files..."
+
+          CHANGED_FILES=$(git diff \
+            --name-only \
+            "${{ github.event.before }}" \
+            "${{ github.sha }}")
+
+          echo ""
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          echo ""
 
           SERVICES="[]"
+
+          # --------------------------------------------------------
+          # BACKEND
+          # --------------------------------------------------------
 
           if echo "$CHANGED_FILES" | grep -q '^backend/'; then
             SERVICES='["backend"]'
           fi
 
+          # --------------------------------------------------------
+          # ADMIN BACKEND
+          # --------------------------------------------------------
+
           if echo "$CHANGED_FILES" | grep -q '^admin-backend/'; then
+
             if [ "$SERVICES" = "[]" ]; then
               SERVICES='["admin-backend"]'
             else
               SERVICES=$(echo "$SERVICES" | sed 's/]$/, "admin-backend"]/')
             fi
+
           fi
 
+          # --------------------------------------------------------
+          # FRONTEND
+          # --------------------------------------------------------
+
           if echo "$CHANGED_FILES" | grep -q '^frontend/'; then
+
             if [ "$SERVICES" = "[]" ]; then
               SERVICES='["frontend"]'
             else
               SERVICES=$(echo "$SERVICES" | sed 's/]$/, "frontend"]/')
             fi
+
           fi
 
-          echo "Detected services: $SERVICES"
+          echo ""
+          echo "Detected services:"
+          echo "$SERVICES"
+          echo ""
+
           echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
 
+
+  # ==============================================================
+  # BUILD / SCAN / PUSH
+  # ==============================================================
+
   build-and-push:
+
     needs: detect-changes
 
     if: needs.detect-changes.outputs.services != '[]'
 
     strategy:
       fail-fast: false
+
       matrix:
         service: ${{ fromJson(needs.detect-changes.outputs.services) }}
 
