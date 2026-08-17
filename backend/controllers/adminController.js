@@ -26,10 +26,10 @@ const getStats = async (req, res) => {
       Service.countDocuments(),
       Professional.countDocuments(),
       EmergencyRequest.countDocuments(),
-      Booking.countDocuments({ status: "pending" }),
-      Booking.countDocuments({ status: "confirmed" }),
-      Booking.countDocuments({ status: "cancelled" }),
-      Booking.countDocuments({ status: "completed" }),
+      Booking.countDocuments({ status: { $in: ["Assigned", "pending", "Created"] } }),
+      Booking.countDocuments({ status: { $in: ["Confirmed", "confirmed"] } }),
+      Booking.countDocuments({ status: { $in: ["Cancelled", "cancelled"] } }),
+      Booking.countDocuments({ status: { $in: ["Completed", "completed"] } }),
       Booking.find()
         .sort({ createdAt: -1 })
         .limit(5)
@@ -39,8 +39,8 @@ const getStats = async (req, res) => {
 
     // Revenue estimate (₹ sum from confirmed/completed bookings)
     const revenueAgg = await Booking.aggregate([
-      { $match: { status: { $in: ["confirmed", "completed"] } } },
-      { $group: { _id: null, total: { $sum: "$amount" } } },
+      { $match: { status: { $in: ["Confirmed", "confirmed", "Completed", "completed"] } } },
+      { $group: { _id: null, total: { $sum: "$totalPrice" } } },
     ]);
     const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
 
@@ -102,7 +102,7 @@ const getAllBookings = async (req, res) => {
       .sort({ createdAt: -1 })
       .populate("user", "name email")
       .populate("service", "name category price")
-      .populate("professional", "name specialization");
+      .populate("professional", "name category experience");
     res.status(200).json({ success: true, bookings });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

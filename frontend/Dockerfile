@@ -1,31 +1,28 @@
 # ============================================================
-# Stage 1: Build React application
+# Stage 1: Build React/Vite application
 # ============================================================
-
 FROM node:22-alpine AS build
 
 WORKDIR /app
 
-# Copy dependency files first for better Docker layer caching
+# Copy dependency definition files
 COPY package.json package-lock.json ./
 
 # Install dependencies
 RUN npm ci --no-audit --no-fund
 
-# Copy application source
+# Copy application source files
 COPY . .
 
-# Build React/Vite application
+# Build production React bundle
 RUN npm run build
 
-
 # ============================================================
-# Stage 2: Nginx production runtime
+# Stage 2: Nginx production static file serving
 # ============================================================
+FROM nginx:1.27-alpine AS runtime
 
-FROM nginx:1.29-alpine AS runtime
-
-# Update Alpine packages to latest security fixes
+# Upgrade OS packages and install wget for health check
 RUN apk update && \
     apk upgrade --no-cache && \
     apk add --no-cache wget && \
@@ -34,22 +31,21 @@ RUN apk update && \
 # Remove default Nginx configuration
 RUN rm -f /etc/nginx/conf.d/default.conf
 
-# Copy our Nginx configuration
+# Copy custom Nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy React production build
+# Copy compiled static assets from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Nginx listens on port 80
+# Expose HTTP port
 EXPOSE 80
 
-# Container health check
+# Health check against Nginx frontend health endpoint
 HEALTHCHECK \
-    --interval=30s \
+    --interval=15s \
     --timeout=5s \
     --start-period=10s \
     --retries=3 \
-    CMD wget -qO- http://127.0.0.1/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1/health || exit 1
 
-# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]

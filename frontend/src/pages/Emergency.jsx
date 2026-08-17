@@ -5,18 +5,18 @@ import {
 } from "lucide-react";
 
 const CATEGORIES = [
-  { value: "Electrical", label: "⚡ Electrical", sub: "Short Circuit, Sparking, Blackout",  defaultSeverity: "High"     },
-  { value: "Plumbing",   label: "💧 Plumbing",   sub: "Burst Pipe, Sewage, Faucet Flood",   defaultSeverity: "Medium"   },
-  { value: "Security",   label: "🔒 Security",   sub: "Lockout, Smart Lock, Break-in",      defaultSeverity: "High"     },
-  { value: "Fire",       label: "🔥 Fire",       sub: "Active Fire, Smoke, Gas Leak",       defaultSeverity: "Critical" },
-  { value: "Medical",    label: "🏥 Medical",    sub: "Injury, Unconscious, Cardiac Event", defaultSeverity: "Critical" }
+  { value: "Electrical", label: "Electrical", sub: "Short Circuit, Sparking, Blackout",  defaultSeverity: "High"     },
+  { value: "Plumbing",   label: "Plumbing",   sub: "Burst Pipe, Sewage, Faucet Flood",   defaultSeverity: "Medium"   },
+  { value: "Security",   label: "Security",   sub: "Lockout, Smart Lock, Break-in",      defaultSeverity: "High"     },
+  { value: "Fire",       label: "Fire",       sub: "Active Fire, Smoke, Gas Leak",       defaultSeverity: "Critical" },
+  { value: "Medical",    label: "Medical",    sub: "Injury, Unconscious, Cardiac Event", defaultSeverity: "Critical" }
 ];
 
 const SEVERITY_CONFIG = {
-  Low:      { color: "#16a34a", bg: "#dcfce7", border: "#bbf7d0", eta: 30, icon: "🟢", fireEngine: false, emergencyNumber: null            },
-  Medium:   { color: "#d97706", bg: "#fef3c7", border: "#fde68a", eta: 20, icon: "🟡", fireEngine: false, emergencyNumber: "1800-SERV-HELP" },
-  High:     { color: "#dc2626", bg: "#fee2e2", border: "#fecaca", eta: 10, icon: "🔴", fireEngine: true,  emergencyNumber: "101"            },
-  Critical: { color: "#7c3aed", bg: "#ede9fe", border: "#c4b5fd", eta: 5,  icon: "🚨", fireEngine: true,  emergencyNumber: "101"            }
+  Low:      { color: "#374151", bg: "#f3f4f6", border: "#e5e7eb", eta: 30, fireEngine: false, emergencyNumber: null            },
+  Medium:   { color: "#d97706", bg: "#fef3c7", border: "#fde68a", eta: 20, fireEngine: false, emergencyNumber: "1800-SERV-HELP" },
+  High:     { color: "#dc2626", bg: "#fee2e2", border: "#fecaca", eta: 10, fireEngine: true,  emergencyNumber: "101"            },
+  Critical: { color: "#991b1b", bg: "#fee2e2", border: "#fca5a5", eta: 5,  fireEngine: true,  emergencyNumber: "101"            }
 };
 
 export default function Emergency({ activeEmergencies, onDispatchEmergency, showToast, token }) {
@@ -76,33 +76,33 @@ export default function Emergency({ activeEmergencies, onDispatchEmergency, show
 
       {/* ── Header Banner ─────────────────────────────────────────── */}
       <div style={{
-        background: "linear-gradient(135deg, #dc2626 0%, #9333ea 100%)",
-        color: "white", padding: "26px 32px", borderRadius: "20px",
+        background: "#1e293b",
+        color: "white", padding: "24px 28px", borderRadius: "16px",
         display: "flex", alignItems: "center", gap: "20px",
-        marginBottom: "32px", boxShadow: "0 8px 32px rgba(220,38,38,0.22)", flexWrap: "wrap"
+        marginBottom: "32px", border: "1px solid #334155", flexWrap: "wrap"
       }}>
         <div style={{
-          background: "rgba(255,255,255,0.18)", padding: "14px", borderRadius: "50%",
-          animation: "pulse 2s infinite", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+          background: "rgba(255,255,255,0.1)", padding: "12px", borderRadius: "12px",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
         }}>
-          <ShieldAlert size={32} />
+          <ShieldAlert size={28} />
         </div>
         <div style={{ flex: 1, minWidth: "200px" }}>
-          <h1 style={{ fontSize: "1.4rem", fontWeight: 800, margin: 0 }}>Emergency Services</h1>
-          <p style={{ opacity: 0.88, fontSize: "0.88rem", margin: "4px 0 0" }}>
-            Submit your emergency and a specialist will be dispatched immediately.
+          <h1 style={{ fontSize: "1.3rem", fontWeight: 700, margin: 0 }}>Emergency Services</h1>
+          <p style={{ opacity: 0.8, fontSize: "0.88rem", margin: "4px 0 0" }}>
+            Submit your emergency request to dispatch a verified specialist.
           </p>
         </div>
         {/* Quick-dial numbers */}
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {[["🚒", "101", "Fire"], ["🏥", "108", "Ambulance"], ["🚔", "100", "Police"]].map(([icon, num, lbl]) => (
+          {[["101", "Fire"], ["108", "Ambulance"], ["100", "Police"]].map(([num, lbl]) => (
             <a key={num} href={`tel:${num}`} style={{
               display: "flex", flexDirection: "column", alignItems: "center",
-              background: "rgba(255,255,255,0.14)", padding: "8px 14px",
-              borderRadius: "10px", textDecoration: "none", color: "white", transition: "background 0.2s"
+              background: "rgba(255,255,255,0.08)", padding: "8px 14px",
+              borderRadius: "8px", textDecoration: "none", color: "white", border: "1px solid rgba(255,255,255,0.1)"
             }}>
-              <span style={{ fontSize: "0.65rem", opacity: 0.8 }}>{lbl}</span>
-              <span style={{ fontWeight: 900, fontSize: "1.05rem" }}>{icon} {num}</span>
+              <span style={{ fontSize: "0.65rem", opacity: 0.7 }}>{lbl}</span>
+              <span style={{ fontWeight: 800, fontSize: "0.95rem" }}>{num}</span>
             </a>
           ))}
         </div>
@@ -172,10 +172,10 @@ export default function Emergency({ activeEmergencies, onDispatchEmergency, show
               fontSize: "0.8rem", color: sev.color, lineHeight: 1.5
             }}>
               {sev.fireEngine
-                ? <>🚒 <strong>Fire Engine will be dispatched</strong> · Call <strong>{sev.emergencyNumber}</strong> · ETA ~{sev.eta} min</>
+                ? <><strong>Fire Engine will be dispatched</strong> · Call <strong>{sev.emergencyNumber}</strong> · ETA ~{sev.eta} min</>
                 : sev.emergencyNumber
-                  ? <>📞 Helpline: <strong>{sev.emergencyNumber}</strong> · ETA ~{sev.eta} min</>
-                  : <>⏱ ETA: ~{sev.eta} minutes</>
+                  ? <>Helpline: <strong>{sev.emergencyNumber}</strong> · ETA ~{sev.eta} min</>
+                  : <>ETA: ~{sev.eta} minutes</>
               }
             </div>
 
@@ -253,7 +253,7 @@ export default function Emergency({ activeEmergencies, onDispatchEmergency, show
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
                       <div style={{ display: "flex", gap: "8px" }}>
                         <span style={{ background: cfg.bg, color: cfg.color, padding: "4px 12px", borderRadius: "20px", fontSize: "0.78rem", fontWeight: 800 }}>
-                          {cfg.icon} {em.severity}
+                          {em.severity}
                         </span>
                         <span style={{ background: "rgba(99,102,241,0.1)", color: "var(--primary)", padding: "4px 12px", borderRadius: "20px", fontSize: "0.78rem", fontWeight: 700 }}>
                           {em.category}
@@ -284,16 +284,16 @@ export default function Emergency({ activeEmergencies, onDispatchEmergency, show
                     {/* Fire engine info if applicable */}
                     {em.fireEngineNumber && (
                       <div style={{
-                        background: "#fff1f2", border: "1px solid #fecdd3",
+                        background: "#f8fafc", border: "1px solid #e2e8f0",
                         borderRadius: "10px", padding: "10px 14px", marginBottom: "14px",
                         display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "0.82rem"
                       }}>
-                        <span style={{ fontWeight: 700, color: "#be123c" }}>
-                          🚒 Fire Engine: <strong>{em.fireEngineNumber}</strong>
+                        <span style={{ fontWeight: 700, color: "#334155" }}>
+                          Fire Engine: <strong>{em.fireEngineNumber}</strong>
                         </span>
                         {em.emergencyServiceNumber && (
-                          <a href={`tel:${em.emergencyServiceNumber}`} style={{ fontWeight: 700, color: "#be123c", textDecoration: "none" }}>
-                            📞 Call: <strong>{em.emergencyServiceNumber}</strong>
+                          <a href={`tel:${em.emergencyServiceNumber}`} style={{ fontWeight: 700, color: "#0f172a", textDecoration: "none" }}>
+                            Call: <strong>{em.emergencyServiceNumber}</strong>
                           </a>
                         )}
                       </div>

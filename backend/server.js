@@ -8,11 +8,8 @@ const metrics = require("./metrics");
 
 dotenv.config();
 
-// Connect Database & Run Seed
-connectDB().then(() => {
-  const { seedDatabase } = require("./controllers/serviceController");
-  seedDatabase();
-});
+// Connect Database
+connectDB();
 
 const app = express();
 
@@ -39,6 +36,7 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/services", require("./routes/serviceRoutes"));
 app.use("/api/bookings", require("./routes/bookingRoutes"));
 app.use("/api/emergency", require("./routes/emergencyRoutes"));
+app.use("/api/admin", require("./routes/adminRoutes"));
 
 const PORT = process.env.PORT || 5000;
 

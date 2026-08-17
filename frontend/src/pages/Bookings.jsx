@@ -318,14 +318,14 @@ export default function Bookings({ bookings, onCancelBooking, onRateBooking, onA
                     <User size={16} style={{ color: "var(--primary)", marginTop: "2px" }} />
                     <div>
                       <span style={{ display: "block", fontWeight: 700, color: "var(--text-muted)" }}>Professional Assigned</span>
-                      {booking.professional ? (
+                      {booking.professional && (booking.professional.name || typeof booking.professional === "string") ? (
                         <span style={{ fontWeight: 600 }}>{booking.professional.name || "Specialist Assigned"}</span>
                       ) : isCompleted ? (
                         <span style={{ color: "#16a34a", fontWeight: 600 }}>Service Completed</span>
                       ) : isCancelled ? (
                         <span style={{ color: "#6b7280" }}>Not Assigned (Cancelled)</span>
                       ) : (
-                        <span style={{ color: "#b45309" }}>Auto-assigning...</span>
+                        <span style={{ color: "#b45309" }}>No professional currently available</span>
                       )}
                     </div>
                   </div>

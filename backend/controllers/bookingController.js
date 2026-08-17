@@ -51,10 +51,17 @@ const createBooking = async (req, res) => {
     let professional = null;
 
     if (isCustom) {
+      const targetCategory = customCategory || (service ? service.category : "Spa");
       professional = await Professional.findOne({
-        category: customCategory || "Spa",
+        category: targetCategory,
         status: "Available"
-      });
+      }).sort({ rating: -1 });
+
+      if (!professional) {
+        professional = await Professional.findOne({
+          status: "Available"
+        }).sort({ rating: -1 });
+      }
     } else {
       if (serviceId) {
         service = await Service.findById(serviceId);
@@ -64,11 +71,17 @@ const createBooking = async (req, res) => {
           _id: professionalId,
           status: "Available"
         });
-      } else if (service) {
+      }
+      if (!professional && service) {
         professional = await Professional.findOne({
           category: service.category,
           status: "Available"
-        });
+        }).sort({ rating: -1 });
+      }
+      if (!professional) {
+        professional = await Professional.findOne({
+          status: "Available"
+        }).sort({ rating: -1 });
       }
     }
 
@@ -160,6 +173,8 @@ const createBooking = async (req, res) => {
     });
 
     await booking.save();
+    await booking.populate("professional");
+    await booking.populate("service");
 
     const notifications = [];
 
