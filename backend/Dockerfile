@@ -19,7 +19,10 @@ FROM node:22-alpine AS runtime
 
 # Install dumb-init for PID 1 signal handling & wget for health checks
 RUN apk add --no-cache dumb-init wget
-
+# Remove npm from production runtime image
+RUN rm -rf /usr/local/lib/node_modules/npm \
+    /usr/local/bin/npm \
+    /usr/local/bin/npx
 # Create dedicated non-root user and group
 RUN addgroup -g 1001 -S homeease \
     && adduser -S homeease -u 1001 -G homeease

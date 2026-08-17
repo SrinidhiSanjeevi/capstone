@@ -34,9 +34,7 @@ const getStats = async (req, res) => {
         .populate("service", "name category"),
     ]);
 
-    // FIX: the Booking schema field is `totalPrice`, not `amount`.
-    // The old query summed a field that doesn't exist, so revenue was
-    // always silently 0.
+
     const revenueAgg = await Booking.aggregate([
       { $match: { status: { $in: ["confirmed", "completed"] } } },
       { $group: { _id: null, total: { $sum: "$totalPrice" } } },

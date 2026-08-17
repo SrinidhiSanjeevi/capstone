@@ -1,7 +1,4 @@
 const mongoose = require("mongoose");
-const dns = require("dns");
-
-dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const connectDB = async () => {
   try {
@@ -12,7 +9,10 @@ const connectDB = async () => {
 
     console.log("Admin Microservice MongoDB Connected Successfully");
   } catch (error) {
-    console.error("Admin Microservice MongoDB Connection Failed:", error.message);
+    console.error(
+      "Admin Microservice MongoDB Connection Failed:",
+      error.message
+    );
     process.exit(1);
   }
 };
