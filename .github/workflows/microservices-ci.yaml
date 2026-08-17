@@ -32,10 +32,19 @@ jobs:
 
     steps:
 
+      # ------------------------------------------------------------
+      # CHECKOUT
+      # ------------------------------------------------------------
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+
+      # ------------------------------------------------------------
+      # DETECT CHANGED SERVICES
+      # ------------------------------------------------------------
 
       - name: Detect changed services
         id: changed
@@ -56,41 +65,78 @@ jobs:
 
           SERVICES="[]"
 
-          # --------------------------------------------------------
-          # BACKEND
-          # --------------------------------------------------------
 
-          if echo "$CHANGED_FILES" | grep -q '^backend/'; then
-            SERVICES='["backend"]'
-          fi
+          # ========================================================
+          # CI/CD WORKFLOW CHANGE
+          # ========================================================
+          # If the pipeline itself changes, test all services.
+          # ========================================================
 
-          # --------------------------------------------------------
-          # ADMIN BACKEND
-          # --------------------------------------------------------
+          if echo "$CHANGED_FILES" | grep -q '^\.github/workflows/'; then
 
-          if echo "$CHANGED_FILES" | grep -q '^admin-backend/'; then
+            echo "CI/CD workflow changed."
+            echo "Running pipeline for all services."
 
-            if [ "$SERVICES" = "[]" ]; then
-              SERVICES='["admin-backend"]'
-            else
-              SERVICES=$(echo "$SERVICES" | sed 's/]$/, "admin-backend"]/')
+            SERVICES='["backend", "admin-backend", "frontend"]'
+
+          else
+
+            # ======================================================
+            # BACKEND
+            # ======================================================
+
+            if echo "$CHANGED_FILES" | grep -q '^backend/'; then
+
+              SERVICES='["backend"]'
+
+            fi
+
+
+            # ======================================================
+            # ADMIN BACKEND
+            # ======================================================
+
+            if echo "$CHANGED_FILES" | grep -q '^admin-backend/'; then
+
+              if [ "$SERVICES" = "[]" ]; then
+
+                SERVICES='["admin-backend"]'
+
+              else
+
+                SERVICES=$(echo "$SERVICES" | \
+                  sed 's/]$/, "admin-backend"]/')
+
+              fi
+
+            fi
+
+
+            # ======================================================
+            # FRONTEND
+            # ======================================================
+
+            if echo "$CHANGED_FILES" | grep -q '^frontend/'; then
+
+              if [ "$SERVICES" = "[]" ]; then
+
+                SERVICES='["frontend"]'
+
+              else
+
+                SERVICES=$(echo "$SERVICES" | \
+                  sed 's/]$/, "frontend"]/')
+
+              fi
+
             fi
 
           fi
 
-          # --------------------------------------------------------
-          # FRONTEND
-          # --------------------------------------------------------
 
-          if echo "$CHANGED_FILES" | grep -q '^frontend/'; then
-
-            if [ "$SERVICES" = "[]" ]; then
-              SERVICES='["frontend"]'
-            else
-              SERVICES=$(echo "$SERVICES" | sed 's/]$/, "frontend"]/')
-            fi
-
-          fi
+          # ========================================================
+          # OUTPUT
+          # ========================================================
 
           echo ""
           echo "Detected services:"

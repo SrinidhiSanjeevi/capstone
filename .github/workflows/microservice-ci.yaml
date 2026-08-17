@@ -1,6 +1,8 @@
 name: HomeEase Microservice Build
+
 on:
   workflow_call:
+
     inputs:
       service:
         required: true
@@ -9,17 +11,27 @@ on:
     secrets:
       AZURE_CLIENT_ID:
         required: true
+
       AZURE_TENANT_ID:
         required: true
+
       AZURE_SUBSCRIPTION_ID:
         required: true
+
 
 permissions:
   contents: read
   id-token: write
 
+
 jobs:
+
+  # ============================================================
+  # BUILD / SCAN / PUSH
+  # ============================================================
+
   build-scan-push:
+
     runs-on: ubuntu-latest
 
     permissions:
@@ -29,7 +41,9 @@ jobs:
     env:
       ACR_NAME: acrhomeeasedev
       ACR_LOGIN_SERVER: acrhomeeasedev.azurecr.io
+
       IMAGE_NAME: acrhomeeasedev.azurecr.io/homeease-${{ inputs.service }}:${{ github.sha }}
+
 
     steps:
 
@@ -60,6 +74,7 @@ jobs:
 
       - name: Verify Azure Login
         run: |
+
           echo "Azure login successful"
 
           az account show \
@@ -80,7 +95,12 @@ jobs:
 
       - name: Login to Azure Container Registry
         run: |
+
+          echo "Logging into ACR..."
+
           az acr login --name "$ACR_NAME"
+
+          echo "ACR login successful"
 
 
       # ============================================================
@@ -99,8 +119,12 @@ jobs:
         if: inputs.service == 'backend'
         working-directory: backend
         run: |
+
           npm ci --omit=dev --no-audit --no-fund
-          npm audit --omit=dev --audit-level=high
+
+          npm audit \
+            --omit=dev \
+            --audit-level=high
 
 
       # ============================================================
@@ -111,8 +135,12 @@ jobs:
         if: inputs.service == 'admin-backend'
         working-directory: admin-backend
         run: |
+
           npm ci --omit=dev --no-audit --no-fund
-          npm audit --omit=dev --audit-level=high
+
+          npm audit \
+            --omit=dev \
+            --audit-level=high
 
 
       # ============================================================
@@ -123,8 +151,11 @@ jobs:
         if: inputs.service == 'frontend'
         working-directory: frontend
         run: |
+
           npm ci --no-audit --no-fund
-          npm audit --audit-level=high
+
+          npm audit \
+            --audit-level=high
 
 
       # ============================================================
@@ -133,11 +164,18 @@ jobs:
 
       - name: Build Docker image
         run: |
-          echo "Building service:"
+
+          echo "=========================================="
+          echo "Building HomeEase service"
+          echo "=========================================="
+
+          echo "Service:"
           echo "${{ inputs.service }}"
 
           echo "Docker image:"
           echo "$IMAGE_NAME"
+
+          echo "=========================================="
 
           docker build \
             --no-cache \
@@ -166,10 +204,17 @@ jobs:
 
       - name: Push Docker image to ACR
         run: |
-          echo "Pushing image:"
+
+          echo "=========================================="
+          echo "Pushing Docker image to Azure Container Registry"
+          echo "=========================================="
+
+          echo "Image:"
           echo "$IMAGE_NAME"
 
           docker push "$IMAGE_NAME"
 
+          echo "=========================================="
           echo "Successfully pushed:"
           echo "$IMAGE_NAME"
+          echo "=========================================="
