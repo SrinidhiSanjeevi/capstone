@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "homeease.labels" . | nindent 4 }}
     app: frontend
+
 spec:
   replicas: {{ .Values.replicaCount.frontend }}
 
@@ -22,12 +23,14 @@ spec:
     spec:
       containers:
         - name: frontend
+
           image: "{{ .Values.images.frontend.repository }}:{{ .Values.images.frontend.tag }}"
           imagePullPolicy: {{ .Values.images.frontend.pullPolicy }}
 
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 8080
+              protocol: TCP
 
           securityContext:
             runAsNonRoot: true
@@ -39,13 +42,17 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: 80
+              port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
 
           livenessProbe:
             httpGet:
               path: /health
-              port: 80
+              port: 8080
             initialDelaySeconds: 20
             periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
