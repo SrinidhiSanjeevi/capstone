@@ -16,10 +16,10 @@ RUN npm run build
 
 
 # ============================================================
-# Stage 2: Non-root Nginx runtime
+# Stage 2: Non-root Nginx production runtime
 # ============================================================
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.29-alpine-slim AS runtime
 
 RUN rm -f /etc/nginx/conf.d/default.conf
 
@@ -29,11 +29,12 @@ COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=15s \
-            --timeout=5s \
-            --start-period=10s \
-            --retries=3 \
-            CMD wget --no-verbose --tries=1 --spider \
-            http://127.0.0.1:8080/health || exit 1
+HEALTHCHECK \
+    --interval=15s \
+    --timeout=5s \
+    --start-period=10s \
+    --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider \
+    http://127.0.0.1:8080/health || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
