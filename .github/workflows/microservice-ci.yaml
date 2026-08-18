@@ -2,7 +2,6 @@ name: HomeEase Microservice Build
 
 on:
   workflow_call:
-
     inputs:
       service:
         required: true
@@ -18,11 +17,9 @@ on:
       AZURE_SUBSCRIPTION_ID:
         required: true
 
-
 permissions:
   contents: read
   id-token: write
-
 
 jobs:
 
@@ -41,9 +38,7 @@ jobs:
     env:
       ACR_NAME: acrhomeeasedev
       ACR_LOGIN_SERVER: acrhomeeasedev.azurecr.io
-
       IMAGE_NAME: acrhomeeasedev.azurecr.io/homeease-${{ inputs.service }}:${{ github.sha }}
-
 
     steps:
 
@@ -75,12 +70,15 @@ jobs:
       - name: Verify Azure Login
         run: |
 
+          echo "=========================================="
           echo "Azure login successful"
+          echo "=========================================="
 
           az account show \
             --query "{subscription:name,id:id,tenantId:tenantId}" \
             -o table
 
+          echo ""
           echo "Checking HomeEase resource group..."
 
           az group show \
@@ -96,7 +94,9 @@ jobs:
       - name: Login to Azure Container Registry
         run: |
 
-          echo "Logging into ACR..."
+          echo "=========================================="
+          echo "Logging into Azure Container Registry"
+          echo "=========================================="
 
           az acr login --name "$ACR_NAME"
 
@@ -120,7 +120,11 @@ jobs:
         working-directory: backend
         run: |
 
+          echo "Installing backend production dependencies..."
+
           npm ci --omit=dev --no-audit --no-fund
+
+          echo "Running backend production dependency audit..."
 
           npm audit \
             --omit=dev \
@@ -136,7 +140,11 @@ jobs:
         working-directory: admin-backend
         run: |
 
+          echo "Installing admin-backend production dependencies..."
+
           npm ci --omit=dev --no-audit --no-fund
+
+          echo "Running admin-backend production dependency audit..."
 
           npm audit \
             --omit=dev \
@@ -152,9 +160,18 @@ jobs:
         working-directory: frontend
         run: |
 
+          echo "Installing frontend dependencies..."
+
+          # Vite/React build tools are required for npm run build.
+          # Therefore devDependencies must be installed here.
           npm ci --no-audit --no-fund
 
+          echo "Running frontend production dependency audit..."
+
+          # Do not fail CI because of build-time devDependencies
+          # such as Vite/esbuild/postcss.
           npm audit \
+            --omit=dev \
             --audit-level=high
 
 
@@ -172,6 +189,7 @@ jobs:
           echo "Service:"
           echo "${{ inputs.service }}"
 
+          echo ""
           echo "Docker image:"
           echo "$IMAGE_NAME"
 
@@ -214,6 +232,7 @@ jobs:
 
           docker push "$IMAGE_NAME"
 
+          echo ""
           echo "=========================================="
           echo "Successfully pushed:"
           echo "$IMAGE_NAME"
