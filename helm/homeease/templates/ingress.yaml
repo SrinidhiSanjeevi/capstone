@@ -10,13 +10,34 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer }}
+    {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
+
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ include "homeease.fullname" . }}-tls
+  {{- end }}
 
   rules:
     - host: {{ .Values.ingress.host }}
       http:
         paths:
+
+          # Admin health check - intentionally public
+          - path: /admin-health
+            pathType: Exact
+            backend:
+              service:
+                name: admin-service
+                port:
+                  number: 5001
+
+          # Admin APIs - protected by JWT + admin role
           - path: /api/admin
             pathType: Prefix
             backend:
@@ -25,6 +46,7 @@ spec:
                 port:
                   number: 5001
 
+          # Main backend APIs
           - path: /api
             pathType: Prefix
             backend:
@@ -33,6 +55,7 @@ spec:
                 port:
                   number: 5000
 
+          # Frontend
           - path: /
             pathType: Prefix
             backend:
@@ -40,4 +63,5 @@ spec:
                 name: frontend-service
                 port:
                   number: 80
+
 {{- end }}

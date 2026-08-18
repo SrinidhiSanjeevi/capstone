@@ -59,3 +59,8 @@ variable "tenant_id" {
   description = "Azure tenant ID"
   type        = string
 }
+
+variable "aks_oidc_issuer_url" {
+  description = "OIDC issuer URL for the existing AKS cluster"
+  type        = string
+}

@@ -59,3 +59,21 @@ module "keyvault" {
 
   depends_on = [module.resource_group]
 }
+
+
+module "workload_identity" {
+  source = "../../modules/workload-identity"
+
+  resource_group_name = var.resource_group_name
+  location            = var.location
+
+  identity_name             = "homeease-workload-identity"
+  federated_credential_name = "homeease-aks-federation"
+
+  aks_oidc_issuer_url = var.aks_oidc_issuer_url
+
+  namespace            = "homeease"
+  service_account_name = "homeease-workload-sa"
+
+  key_vault_id = module.keyvault.id
+}

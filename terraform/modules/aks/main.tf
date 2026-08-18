@@ -9,14 +9,16 @@ resource "azurerm_kubernetes_cluster" "this" {
   # Correct for dev/capstone.
   sku_tier = var.sku_tier
 
-  # Existing AKS cluster already has OIDC enabled.
-  # Azure does not allow OIDC to be disabled after enabling it.
-  oidc_issuer_enabled = true
+ # Existing AKS cluster already has OIDC enabled.
+oidc_issuer_enabled = true
 
-  # System-assigned managed identity.
-  identity {
-    type = "SystemAssigned"
-  }
+# Enable Azure Workload Identity for Kubernetes service accounts.
+workload_identity_enabled = true
+
+# System-assigned managed identity.
+identity {
+  type = "SystemAssigned"
+}
 
   default_node_pool {
     name                        = "system"

@@ -42,6 +42,14 @@ app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok", service: "homeease-admin", timestamp: new Date().toISOString() });
 });
 
+app.get("/admin-health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "homeease-admin",
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get("/metrics", async (req, res) => {
   res.set("Content-Type", metrics.register.contentType);
   res.end(await metrics.register.metrics());
