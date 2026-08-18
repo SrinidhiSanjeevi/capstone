@@ -1,24 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
   name: {{ include "homeease.fullname" . }}-backend
   labels:
     {{- include "homeease.labels" . | nindent 4 }}
     app: backend
+
 spec:
   replicas: {{ .Values.replicaCount.backend }}
+
   selector:
     matchLabels:
       {{- include "homeease.selectorLabels" . | nindent 6 }}
       app: backend
+
   template:
     metadata:
       labels:
         {{- include "homeease.selectorLabels" . | nindent 8 }}
         app: backend
+        azure.workload.identity/use: "true"
+
     spec:
+      serviceAccountName: homeease-workload-sa
+
       containers:
         - name: backend
+
           image: "{{ .Values.images.backend.repository }}:{{ .Values.images.backend.tag }}"
           imagePullPolicy: {{ .Values.images.backend.pullPolicy }}
 
@@ -64,6 +73,11 @@ spec:
                   name: {{ include "homeease.fullname" . }}-secrets
                   key: EMAIL_FROM
 
+          volumeMounts:
+            - name: keyvault-secrets
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
+
           securityContext:
             runAsNonRoot: true
             runAsUser: 1001
@@ -89,3 +103,11 @@ spec:
             periodSeconds: 20
             timeoutSeconds: 5
             failureThreshold: 3
+
+      volumes:
+        - name: keyvault-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: {{ .Values.secrets.keyVault.secretProviderClass }}

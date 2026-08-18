@@ -3,7 +3,9 @@ replicaCount:
   adminBackend: 1
   frontend: 1
 
+
 images:
+
   backend:
     repository: acrhomeeasedev.azurecr.io/homeease-backend
     tag: latest
@@ -19,25 +21,30 @@ images:
     tag: latest
     pullPolicy: IfNotPresent
 
+
 services:
+
   backend:
     port: 5000
     targetPort: 5000
 
   adminBackend:
     port: 5001
-    targetPort: 5000
+    targetPort: 5001
 
   frontend:
     port: 80
     targetPort: 80
+
 
 ingress:
   enabled: false
   className: nginx
   host: homeease.local
 
+
 resources:
+
   backend:
     requests:
       cpu: 100m
@@ -62,7 +69,9 @@ resources:
       cpu: 300m
       memory: 256Mi
 
+
 autoscaling:
+
   backend:
     enabled: false
     minReplicas: 1
@@ -81,10 +90,21 @@ autoscaling:
     maxReplicas: 3
     targetCPUUtilizationPercentage: 70
 
+
+keyVault:
+  name: kv-homeease-dev-001
+  tenantId: "25ea82b6-dfae-45a3-8712-f925d1b3397d"
+
+
 secrets:
   keyVault:
     enabled: true
     secretProviderClass: homeease-secrets
+
+
+workloadIdentity:
+  clientId: ""
+
 
 monitoring:
   enabled: false

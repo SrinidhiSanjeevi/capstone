@@ -3,23 +3,31 @@ replicaCount:
   adminBackend: 1
   frontend: 1
 
+
 images:
+
   backend:
     repository: acrhomeeasedev.azurecr.io/homeease-backend
     tag: latest
+    pullPolicy: IfNotPresent
 
   adminBackend:
     repository: acrhomeeasedev.azurecr.io/homeease-admin-backend
     tag: latest
+    pullPolicy: IfNotPresent
 
   frontend:
     repository: acrhomeeasedev.azurecr.io/homeease-frontend
     tag: latest
+    pullPolicy: IfNotPresent
+
 
 ingress:
   enabled: false
 
+
 autoscaling:
+
   backend:
     enabled: false
 
@@ -28,11 +36,36 @@ autoscaling:
 
   frontend:
     enabled: false
+
+
+keyVault:
+  name: kv-homeease-dev-001
+  tenantId: "25ea82b6-dfae-45a3-8712-f925d1b3397d"
+
 
 secrets:
   keyVault:
     enabled: true
     secretProviderClass: homeease-secrets
 
+
+workloadIdentity:
+  clientId: "0663c3d7-55c5-41ff-95c9-dbe93c7ead44"
+
+
 monitoring:
   enabled: false
+
+
+images:
+  backend:
+    repository: acrhomeeasedev.azurecr.io/homeease-backend
+    tag: "a0d965e901af5c0aca32fcd7ab50631fb42be726"
+
+  adminBackend:
+    repository: acrhomeeasedev.azurecr.io/homeease-admin-backend
+    tag: "a0d965e901af5c0aca32fcd7ab50631fb42be726"
+
+  frontend:
+    repository: acrhomeeasedev.azurecr.io/homeease-frontend
+    tag: "ed899005e56349a539dda4d894bc6192244ab9e8"
