@@ -19,7 +19,7 @@ RUN npm run build
 # Stage 2: Non-root Nginx production runtime
 # ============================================================
 
-FROM nginxinc/nginx-unprivileged:1.29-alpine-slim AS runtime
+FROM nginxinc/nginx-unprivileged:1.31.2-alpine3.23-slim AS runtime
 
 RUN rm -f /etc/nginx/conf.d/default.conf
 
