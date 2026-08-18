@@ -1,12 +1,12 @@
 images:
   backend:
     repository: acrhomeeasedev.azurecr.io/homeease-backend
-    tag: 3cbd5224e67ad070a71d374198c32f14fe482e99
+    tag: ed899005e56349a539dda4d894bc6192244ab9e8
     pullPolicy: IfNotPresent
 
   adminBackend:
     repository: acrhomeeasedev.azurecr.io/homeease-admin-backend
-    tag: 3cbd5224e67ad070a71d374198c32f14fe482e99
+    tag: ed899005e56349a539dda4d894bc6192244ab9e8
     pullPolicy: IfNotPresent
 
   frontend:

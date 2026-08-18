@@ -13,6 +13,7 @@ metadata:
     {{- if .Values.ingress.tls.enabled }}
     cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer }}
     {{- end }}
+
 spec:
   ingressClassName: {{ .Values.ingress.className }}
 
@@ -24,11 +25,9 @@ spec:
   {{- end }}
 
   rules:
-    - host: {{ .Values.ingress.host }}
-      http:
+    - http:
         paths:
-
-          # Admin health check - intentionally public
+          # Admin health check
           - path: /admin-health
             pathType: Exact
             backend:
@@ -37,7 +36,7 @@ spec:
                 port:
                   number: 5001
 
-          # Admin APIs - protected by JWT + admin role
+          # Admin API - JWT protected by admin-backend
           - path: /api/admin
             pathType: Prefix
             backend:
@@ -46,7 +45,7 @@ spec:
                 port:
                   number: 5001
 
-          # Main backend APIs
+          # Main backend API
           - path: /api
             pathType: Prefix
             backend:
