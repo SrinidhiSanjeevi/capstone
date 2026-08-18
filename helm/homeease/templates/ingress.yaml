@@ -27,7 +27,6 @@ spec:
   rules:
     - http:
         paths:
-          # Admin health check
           - path: /admin-health
             pathType: Exact
             backend:
@@ -36,7 +35,6 @@ spec:
                 port:
                   number: 5001
 
-          # Admin API - JWT protected by admin-backend
           - path: /api/admin
             pathType: Prefix
             backend:
@@ -45,7 +43,6 @@ spec:
                 port:
                   number: 5001
 
-          # Main backend API
           - path: /api
             pathType: Prefix
             backend:
@@ -54,7 +51,6 @@ spec:
                 port:
                   number: 5000
 
-          # Frontend
           - path: /
             pathType: Prefix
             backend:
