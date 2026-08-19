@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "homeease.fullname" . }}-metrics-exporter
+  labels:
+    release: prometheus   # must match kube-prometheus-stack's serviceMonitorSelector — verify against your existing servicemonitor.yaml
+spec:
+  selector:
+    matchLabels:
+      app: metrics-exporter
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
