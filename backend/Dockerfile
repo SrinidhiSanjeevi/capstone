@@ -52,4 +52,4 @@ HEALTHCHECK \
 # Process supervisor signal forwarding
 ENTRYPOINT ["dumb-init", "--"]
 
-CMD ["node", "server.js"]
+CMD ["node", "server.js"]# CI rebuild
