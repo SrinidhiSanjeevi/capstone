@@ -12,7 +12,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund \
     && npm cache clean --force
 
-# ============================================================
+# ===========================================================
 # Stage 2: Production runtime image
 # ============================================================
 FROM node:22-alpine AS runtime
