@@ -801,16 +801,12 @@ export default function AdminDashboard({ token, user, onLogout }) {
 
   // ── Helpers ─────────────────────────────────────────────────
   const statusColor = (s) =>
-    ({
-      pending: "#f59e0b",
-      confirmed: "#3b82f6",
-      completed: "#10b981",
-      cancelled: "#ef4444",
-      Created: "#f59e0b",
-      Confirmed: "#3b82f6",
-      Completed: "#10b981",
-      Cancelled: "#ef4444"
-    }[s] || "#6b7280");
+  ({
+    Assigned: "#f59e0b",
+    Confirmed: "#3b82f6",
+    Completed: "#10b981",
+    Cancelled: "#ef4444"
+  }[s] || "#6b7280");
 
   const statusIcon = (s) =>
     ({
@@ -2118,8 +2114,8 @@ export default function AdminDashboard({ token, user, onLogout }) {
                                 fontWeight: 600
                               }}
                             >
-                              <option value="Created">
-                                Created
+                              <option value="Assigned">
+                                Assigned
                               </option>
                               <option value="Confirmed">
                                 Confirmed
