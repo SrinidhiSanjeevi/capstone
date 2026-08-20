@@ -23,10 +23,10 @@ const getStats = async (req, res) => {
       Service.countDocuments(),
       Professional.countDocuments(),
       EmergencyRequest.countDocuments(),
-      Booking.countDocuments({ status: "pending" }),
-      Booking.countDocuments({ status: "confirmed" }),
-      Booking.countDocuments({ status: "cancelled" }),
-      Booking.countDocuments({ status: "completed" }),
+      Booking.countDocuments({ status: "Assigned" }),   // "pendingBookings" = not yet confirmed
+      Booking.countDocuments({ status: "Confirmed" }),
+      Booking.countDocuments({ status: "Cancelled" }),
+      Booking.countDocuments({ status: "Completed" }),
       Booking.find()
         .sort({ createdAt: -1 })
         .limit(5)
@@ -36,8 +36,8 @@ const getStats = async (req, res) => {
 
 
     const revenueAgg = await Booking.aggregate([
-      { $match: { status: { $in: ["confirmed", "completed"] } } },
-      { $group: { _id: null, total: { $sum: "$totalPrice" } } },
+    { $match: { status: { $in: ["Confirmed", "Completed"] } } },
+    { $group: { _id: null, total: { $sum: "$totalPrice" } } },
     ]);
     const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
 
@@ -92,7 +92,7 @@ const getAllBookings = async (req, res) => {
       .sort({ createdAt: -1 })
       .populate("user", "name email")
       .populate("service", "name category price")
-      .populate("professional", "name specialization");
+      .populate("professional", "name category experience");
     res.status(200).json({ success: true, bookings });
   } catch (error) {
     console.error("Get All Bookings Error:", error);
@@ -103,7 +103,7 @@ const getAllBookings = async (req, res) => {
 const updateBookingStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const validStatuses = ["pending", "confirmed", "completed", "cancelled"];
+    const validStatuses = ["Assigned", "Confirmed", "Completed", "Cancelled"];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ success: false, message: "Invalid status value" });
     }
