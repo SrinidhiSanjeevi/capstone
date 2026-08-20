@@ -5,7 +5,7 @@ export default function Profile({ user, bookings, onLogout }) {
   // Stats calculations
   const totalBookings = bookings.length;
   const completedBookings = bookings.filter((b) => b.status === "Completed").length;
-  const activeBookings = bookings.filter((b) => b.status === "Confirmed" || b.status === "Pending").length;
+  const activeBookings = bookings.filter((b) => b.status === "Confirmed" || b.status === "Assigned").length;
   
   const totalSpent = bookings
     .filter((b) => b.status === "Completed" || b.status === "Confirmed")
