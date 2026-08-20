@@ -3,10 +3,12 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const connectDB = require("./config/db");
 const metrics = require("./metrics");
+const { startMetricsCollector } = require("./services/metricsCollector");
 
 dotenv.config();
 
 connectDB();
+startMetricsCollector(); // polls Mongo every 30s in-process, sets business Gauges — no separate pod needed
 
 const app = express();
 app.use(cors());

@@ -70,7 +70,7 @@ module "workload_identity" {
   identity_name             = "homeease-workload-identity"
   federated_credential_name = "homeease-aks-federation"
 
-  aks_oidc_issuer_url = var.aks_oidc_issuer_url
+  aks_oidc_issuer_url = module.aks.oidc_issuer_url
 
   namespace            = "homeease"
   service_account_name = "homeease-workload-sa"
